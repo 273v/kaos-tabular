@@ -1,0 +1,184 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  # Manual fallback so a failed publish (e.g. a transient PyPI 5xx) can
+  # be retried without re-tagging.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build distribution
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          cache-suffix: release-py3.13
+
+      - name: Install Python 3.13
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync --group dev --group dev-mcp --python 3.13
+
+      - name: Verify version matches tag
+        id: version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION=$(uv run python -c "from kaos_tabular._version import __version__; print(__version__)")
+          TAG=${GITHUB_REF_NAME#v}
+          if [ "$VERSION" != "$TAG" ]; then
+            echo "::error::Tag '$TAG' does not match _version.py value '$VERSION'"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Pre-publish QA
+        run: |
+          uv run ruff format --check kaos_tabular/ tests/
+          uv run ruff check kaos_tabular/ tests/
+          uv run ty check kaos_tabular/ tests/
+          uv run pytest tests/unit/ --no-cov
+
+      - name: Build wheel + sdist
+        run: uv build
+
+      - name: Verify metadata
+        run: uvx --from twine twine check --strict dist/*
+
+      - name: Smoke-test the built wheel in a clean venv
+        run: |
+          uv venv --python 3.13 /tmp/smoke
+          uv pip install --python /tmp/smoke/bin/python dist/kaos_tabular-*-py3-none-any.whl
+          /tmp/smoke/bin/python -c "
+          import csv, tempfile
+          from pathlib import Path
+          import kaos_tabular
+          from kaos_tabular import (
+              EngineError, EngineEvent, KaosTabularError, QueryError,
+              RegistrationError, TabularEngine,
+              read_csv, read_json, read_parquet,
+          )
+          assert kaos_tabular.__version__, 'version missing from wheel'
+          assert kaos_tabular.__all__ == [
+              'EngineError', 'EngineEvent', 'KaosTabularError', 'QueryError',
+              'RegistrationError', 'TabularEngine', '__version__',
+              'read_csv', 'read_json', 'read_parquet',
+          ]
+          # Tool count: 17 (8 core + 6 reshape + 3 structured).
+          from kaos_core import KaosRuntime
+          from kaos_tabular.tools import register_tabular_tools
+          assert register_tabular_tools(KaosRuntime()) == 17
+          # Functional smoke: register → query → export → analytical → structured.
+          # Note: the did-you-mean assertion uses a table name with enough
+          # length that a single-character typo crosses the difflib 0.6
+          # similarity cutoff. Short identifiers (one or two chars) cannot
+          # produce a suggestion under that cutoff by design — see
+          # tests/unit/test_structured_ops.py::TestDidYouMean.
+          with tempfile.TemporaryDirectory() as tmp:
+              p = Path(tmp) / 'sales.csv'
+              with p.open('w', newline='') as f:
+                  w = csv.writer(f); w.writerow(['a','b']); w.writerow([1,'x']); w.writerow([1,'x']); w.writerow([2,'y'])
+              with TabularEngine() as engine:
+                  engine.register_file(p, table_name='sales')
+                  assert engine.execute('SELECT count(*) FROM sales').rows[0][0] == 3
+                  out = Path(tmp) / 'out.parquet'
+                  assert engine.export_table('sales', out, format='parquet') == 3
+                  assert engine.find_duplicates('sales').row_count == 2
+                  # aggregate / filter / top_k (structured shape ops)
+                  agg = engine.aggregate('sales', aggregates=[('count','*','n')], group_by=['a'])
+                  assert agg.row_count == 2
+                  assert engine.filter('sales', where='a = 1').row_count == 2
+                  assert engine.top_k('sales', by='a', n=1).rows[0][0] == 2
+                  # did-you-mean: 'saless' against 'sales' (5/6 chars match)
+                  # → trips the 0.6 similarity cutoff, suggestion fires.
+                  try:
+                      engine.describe_table('saless')
+                  except EngineError as exc:
+                      assert \"Did you mean 'sales'\" in str(exc), str(exc)
+                  else:
+                      raise AssertionError('expected EngineError with did-you-mean')
+                  assert any(e.event_type == 'register' for e in engine.history())
+          print(f'kaos-tabular {kaos_tabular.__version__}: smoke OK')
+          "
+
+      - name: Upload distribution artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          retention-days: 30
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/kaos-tabular
+    permissions:
+      id-token: write  # OIDC for Trusted Publishing
+    steps:
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          attestations: true
+          skip-existing: false
+
+  github-release:
+    name: Create GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          PRERELEASE_FLAG=""
+          if [[ "$VERSION" == *a* || "$VERSION" == *b* || "$VERSION" == *rc* ]]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            --title "kaos-tabular $VERSION" \
+            --notes-from-tag \
+            $PRERELEASE_FLAG \
+            dist/*

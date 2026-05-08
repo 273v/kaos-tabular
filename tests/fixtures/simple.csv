@@ -1,0 +1,11 @@
+id,name,amount,date,active
+1,Alice,1234.56,2024-01-15,true
+2,Bob,789.01,2024-02-20,false
+3,Charlie,2345.67,2024-03-10,true
+4,Diana,456.78,2024-04-05,true
+5,Eve,3456.89,2024-05-12,false
+6,Frank,567.90,2024-06-18,true
+7,Grace,4567.01,2024-07-22,false
+8,Hank,678.12,2024-08-30,true
+9,Iris,5678.23,2024-09-14,true
+10,Jack,789.34,2024-10-01,false

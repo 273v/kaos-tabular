@@ -1,0 +1,161 @@
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kaos-tabular"
+dynamic = ["version"]
+description = "DuckDB-powered tabular data engine for KAOS — register CSV / Parquet / JSON / SQLite, run SQL, export typed results"
+readme = "README.md"
+requires-python = ">=3.13"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [
+  { name = "273 Ventures LLC", email = "it@273ventures.com" },
+]
+maintainers = [
+  { name = "Michael Bommarito", email = "mike@273ventures.com" },
+]
+keywords = [
+  "duckdb",
+  "sql",
+  "tabular",
+  "csv",
+  "parquet",
+  "kaos",
+  "mcp",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Topic :: Database :: Database Engines/Servers",
+  "Topic :: Scientific/Engineering",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
+]
+dependencies = [
+  "kaos-content>=0.1.0a2,<0.2",
+  "kaos-core>=0.1.0a4,<0.2",
+  # duckdb 1.4.2 is the earliest release with prebuilt cp313 + cp314
+  # wheels (1.1.1 was the first cp313-only; 1.4.2 added cp314). We
+  # support Python 3.13 + 3.14, so the floor must clear both. Pre-1.4.2
+  # forces a from-source build on cp314, which is what made the
+  # min-deps CI job take 20 minutes.
+  "duckdb>=1.4.2",
+]
+
+[project.optional-dependencies]
+mcp = ["kaos-mcp>=0.1.0a1,<0.2"]
+
+[project.scripts]
+kaos-tabular = "kaos_tabular.cli:main"
+kaos-tabular-serve = "kaos_tabular.serve:main"
+
+[dependency-groups]
+# ``dev`` is the minimum tooling needed to lint, type-check, and run
+# the unit suite. It deliberately does NOT pull ``kaos-mcp`` so the
+# 3.15 CI leg can install + test without going through the
+# ``mcp[cli] -> jsonschema -> rpds-py`` chain (rpds-py 0.30.0 ships no
+# cp315 wheel and its bundled PyO3 doesn't know 3.15). Add the
+# ``dev-mcp`` group on legs / dev environments where the MCP serve
+# path needs exercising — currently 3.13 / 3.14 / 3.14t in CI.
+dev = [
+  "pytest>=8.3.5",
+  "pytest-asyncio>=0.26.0",
+  "pytest-cov>=6.0.0",
+  "ruff>=0.11.0",
+  "ty>=0.0.34,<0.1",
+]
+dev-mcp = [
+  "kaos-mcp>=0.1.0a1",
+]
+
+[project.urls]
+Homepage = "https://kelvin.legal"
+Documentation = "https://docs.kelvin.legal"
+Repository = "https://github.com/273v/kaos-tabular"
+Issues = "https://github.com/273v/kaos-tabular/issues"
+Changelog = "https://github.com/273v/kaos-tabular/blob/main/CHANGELOG.md"
+
+[tool.hatch.version]
+path = "kaos_tabular/_version.py"
+
+[tool.hatch.build.targets.sdist]
+# Sdist intentionally excludes /tests, /docs, and /CLAUDE.md.
+# CLAUDE.md references monorepo-only checklists; tests/integration
+# requires a runtime context. Source code, license, changelog, and
+# packaging metadata are enough for source-build verification on PyPI.
+include = [
+  "/kaos_tabular",
+  "/README.md",
+  "/CHANGELOG.md",
+  "/LICENSE",
+  "/NOTICE",
+  "/pyproject.toml",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["kaos_tabular"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = [
+  "-ra",
+  "--strict-markers",
+  "--strict-config",
+  "--cov=kaos_tabular",
+  "--cov-branch",
+  "--cov-report=term-missing",
+]
+markers = [
+  "integration: end-to-end behavior checks",
+  "unit: focused unit checks",
+  "benchmark: wall-clock performance regression tests (tests/benchmarks/)",
+]
+
+[tool.coverage.run]
+source = ["kaos_tabular"]
+branch = true
+omit = [
+  "*/tests/*",
+]
+
+[tool.coverage.report]
+# Audit-01 KTAB-005: explicit floor. Baseline is 70% as of 0.1.0a1
+# (was 63% pre-audit). The gap to 80%+ is concentrated in tools.py
+# (MCP tool layer) and serve.py (entry point); tests/unit/test_tools.py
+# adds runtime coverage for the parts that can be exercised offline.
+# Raise the floor in subsequent releases as tools.py / serve.py grow
+# their direct unit coverage.
+fail_under = 70
+show_missing = true
+skip_covered = false
+exclude_lines = [
+  "pragma: no cover",
+  "if TYPE_CHECKING:",
+  "@abstractmethod",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "C4", "PTH"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["kaos_tabular"]
+
+[tool.ty.src]
+include = ["kaos_tabular", "tests"]
+
+[tool.uv]
+package = true

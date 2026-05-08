@@ -1,0 +1,339 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # ────────────── lint ──────────────
+  # Separate from tests so format / lint / type failures fail-fast and
+  # are easy to spot without combing through test output.
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          cache-suffix: lint-py3.13
+
+      - name: Install Python 3.13
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync --group dev --group dev-mcp --python 3.13
+
+      - name: Ruff format check
+        run: uv run ruff format --check kaos_tabular/ tests/
+
+      - name: Ruff lint
+        run: uv run ruff check kaos_tabular/ tests/
+
+      - name: Type check (ty)
+        run: uv run ty check kaos_tabular/ tests/
+
+  # ────────────── pre-commit ──────────────
+  # Catches any drift between the local pre-commit config and the
+  # checks above. If a contributor disabled their local hooks, this
+  # job still enforces the contract on the PR.
+  pre-commit:
+    name: Pre-commit hooks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          cache-suffix: pre-commit-py3.13
+
+      - name: Install Python 3.13
+        run: uv python install 3.13
+
+      - name: Install dependencies (needed by the local ty hook)
+        run: uv sync --group dev --group dev-mcp --python 3.13
+
+      - name: Run pre-commit
+        run: uvx pre-commit run --all-files --show-diff-on-failure
+
+  # ────────────── test ──────────────
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    # Stable matrix entries gate PRs; experimental entries
+    # (3.14t free-threaded, 3.15-dev pre-release) are informational
+    # only — the matrix `experimental: true` flag flips
+    # `continue-on-error` so CI is not blocked by upstream churn we
+    # cannot fix.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python-version: "3.13"
+            experimental: false
+          - python-version: "3.14"
+            experimental: false
+          # Free-threaded build (PEP 703). Available since 3.14 GA.
+          # We don't yet ship `Py_GIL_DISABLED` extensions, but we want
+          # early signal that pure-Python imports + tests still work
+          # without the GIL.
+          - python-version: "3.14t"
+            experimental: true
+          # Pre-release of 3.15 (expected GA October 2026). Catches
+          # ecosystem incompatibilities (deferred annotations, removed
+          # APIs) before consumers hit them.
+          - python-version: "3.15"
+            experimental: true
+    continue-on-error: ${{ matrix.experimental }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          # One cache per matrix leg. Without this, all 5 jobs race
+          # on the same cache key and only the first to finish wins —
+          # the others throw away their compiled wheels (Pillow,
+          # pydantic-core, numpy on 3.14t / 3.15) and recompile from
+          # source on every run. The annotation
+          # "Failed to save: Unable to reserve cache with key …"
+          # in the prior CI logs is exactly this race.
+          cache-suffix: test-py${{ matrix.python-version }}
+
+      - name: Install Python ${{ matrix.python-version }}
+        # `--preview` lets `uv python install` resolve in-development
+        # interpreters (3.15) and the free-threaded variant (3.14t).
+        # No-op for stable versions.
+        run: uv python install --preview ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        # 3.15 alpha installs only the ``dev`` group, not ``dev-mcp``.
+        # Reason: the ``[mcp]`` chain pulls ``rpds-py`` (transitively via
+        # ``mcp[cli] -> jsonschema -> referencing``), and rpds-py 0.30.0
+        # ships no cp315 wheel; its bundled PyO3 doesn't know 3.15
+        # natively. Building rpds-py from source would require
+        # ``PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1`` (forces abi3 mode),
+        # which in turn hides ``PyDateAccess`` / ``PyTimeAccess`` /
+        # ``PyDeltaAccess`` (Non-Py_LIMITED_API in PyO3 0.28+) and
+        # breaks pydantic-core's source build — same env var
+        # simultaneously enables one transitive dep and breaks another.
+        # ``serve.py`` and its tests are designed to handle a missing
+        # ``kaos-mcp`` cleanly, so the 3.15 leg's unit suite still
+        # exercises the full engine + MCP-tool surface (with the MCP
+        # transport itself unexercised on 3.15 only). All other legs
+        # install both groups and exercise the full surface.
+        run: |
+          if [[ "${{ matrix.python-version }}" == 3.15* ]]; then
+            uv sync --group dev --python ${{ matrix.python-version }}
+          else
+            uv sync --group dev --group dev-mcp --python ${{ matrix.python-version }}
+          fi
+
+      - name: Run unit tests with coverage
+        # Only `tests/unit/` runs in regular CI. `tests/integration/`
+        # is the live-tier (real provider APIs) and runs separately
+        # with credentials gated behind a manual workflow.
+        run: |
+          uv run pytest tests/unit/ \
+            --cov=kaos_tabular \
+            --cov-branch \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml
+
+      - name: Upload coverage report
+        if: always() && !matrix.experimental
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-${{ matrix.python-version }}
+          path: coverage.xml
+          retention-days: 14
+
+  # ────────────── min-deps ──────────────
+  # Resolve and test against the minimum declared versions of every
+  # dependency so we catch "we said >=X but actually need X+1" drift.
+  # Runs on 3.13 only; 3.14 is the cutting edge and may not have wheels
+  # for very old dep versions.
+  min-deps:
+    name: Test against minimum dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          # min-deps resolves with --resolution=lowest-direct, which
+          # downloads materially different wheel versions than the
+          # other 3.13 jobs. Separate cache so the two don't fight
+          # over the same key.
+          cache-suffix: min-deps-py3.13
+
+      - name: Install Python 3.13
+        run: uv python install 3.13
+
+      - name: Install with lowest-direct resolution
+        run: uv sync --group dev --group dev-mcp --resolution=lowest-direct --python 3.13
+
+      - name: Run unit tests
+        run: |
+          uv run pytest tests/unit/ \
+            --no-cov \
+            -q
+
+  # ────────────── build + wheel smoke test ──────────────
+  build:
+    name: Build distribution + smoke test
+    runs-on: ubuntu-latest
+    # Build only depends on the fast quality gates (lint + pre-commit
+    # + min-deps), NOT the matrix. ``kaos-tabular`` is pure Python — we
+    # ship one universal ``py3-none-any.whl`` regardless of interpreter
+    # version. The matrix legs verify our pure-Python code runs under
+    # different interpreters; their wall-clock time is dominated by
+    # transitive native deps (duckdb, pydantic-core, rpds-py) being
+    # source-built when upstream wheels don't exist for that
+    # interpreter (notably 3.15 alpha, 3.14t free-threaded). Gating
+    # build on the slowest experimental compile would chain a 30-sec
+    # wheel build behind 25+ minutes of upstream Rust/C++ source
+    # builds — pure friction. The matrix legs continue running
+    # informationally; the experimental ones stay ``continue-on-error``.
+    needs: [lint, pre-commit, min-deps]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          cache-suffix: build-py3.13
+
+      - name: Install Python 3.13
+        run: uv python install 3.13
+
+      - name: Build wheel + sdist
+        run: uv build
+
+      - name: Verify metadata (twine check)
+        run: uvx --from twine twine check --strict dist/*
+
+      - name: Smoke-test the built wheel in a clean venv
+        # Install the actually-built wheel (not the source tree) into a
+        # clean Python environment and exercise the public API. This
+        # catches packaging bugs that source-tree tests miss: missing
+        # data files, broken `__init__.py` exports, sdist-only files
+        # that reference dist-only paths, etc.
+        run: |
+          uv venv --python 3.13 /tmp/smoke
+          uv pip install --python /tmp/smoke/bin/python dist/kaos_tabular-*-py3-none-any.whl
+          /tmp/smoke/bin/python -c "
+          import kaos_tabular
+          assert kaos_tabular.__version__, 'version missing from wheel'
+          # Public API surface imports without error.
+          from kaos_tabular import (
+              EngineError,
+              KaosTabularError,
+              QueryError,
+              RegistrationError,
+              TabularEngine,
+              read_csv,
+              read_json,
+              read_parquet,
+          )
+          assert kaos_tabular.__all__ == [
+              'EngineError', 'EngineEvent', 'KaosTabularError', 'QueryError',
+              'RegistrationError', 'TabularEngine', '__version__',
+              'read_csv', 'read_json', 'read_parquet',
+          ], kaos_tabular.__all__
+
+          # py.typed marker shipped (audit-01 KTAB-004).
+          import importlib.resources as ir
+          assert ir.files('kaos_tabular').joinpath('py.typed').is_file(), 'py.typed missing'
+
+          # Tool registration: 17 tools (8 core + 6 reshape + 3 structured).
+          from kaos_core import KaosRuntime
+          from kaos_tabular.tools import register_tabular_tools
+          rt = KaosRuntime()
+          n_tools = register_tabular_tools(rt)
+          assert n_tools == 17, f'expected 17 tools, got {n_tools}'
+
+          # Functional: register → query → export → analytical → structured.
+          # The did-you-mean assertion needs a table name long enough that a
+          # single-character typo crosses difflib's 0.6 similarity cutoff —
+          # ``sales`` (5 chars) vs ``saless`` (6 chars) shares 5/6 chars and
+          # comfortably trips it. Short names (`t` vs `tt`) cannot produce a
+          # suggestion under that cutoff by design; see the unit tests under
+          # tests/unit/test_structured_ops.py::TestDidYouMean.
+          import csv, tempfile
+          from pathlib import Path
+          from kaos_tabular.errors import EngineError
+          with tempfile.TemporaryDirectory() as tmp:
+              csv_path = Path(tmp) / 'sales.csv'
+              with csv_path.open('w', newline='') as f:
+                  w = csv.writer(f); w.writerow(['region','units']); w.writerow(['e',1]); w.writerow(['e',1]); w.writerow(['w',2])
+              with TabularEngine() as engine:
+                  engine.register_file(csv_path, table_name='sales')
+                  result = engine.execute('SELECT count(*) AS n FROM sales')
+                  assert result.rows[0][0] == 3
+                  # export_table (KTAB-003)
+                  out = Path(tmp) / 'out.parquet'
+                  n = engine.export_table('sales', out, format='parquet')
+                  assert n == 3 and out.exists()
+                  # find_duplicates (analytical)
+                  dups = engine.find_duplicates('sales')
+                  assert dups.row_count == 2
+                  # aggregate (structured shape ops)
+                  agg = engine.aggregate('sales', aggregates=[('sum','units','total')], group_by=['region'])
+                  assert agg.row_count == 2
+                  # filter (structured shape ops)
+                  flt = engine.filter('sales', where='units > 1')
+                  assert flt.row_count == 1
+                  # top_k (structured shape ops)
+                  topk = engine.top_k('sales', by='units', n=2)
+                  assert topk.row_count == 2
+                  # did-you-mean suggestions: typo'd 'saless' against 'sales'
+                  try:
+                      engine.aggregate('saless', aggregates=[('sum','units')])
+                  except EngineError as exc:
+                      assert \"Did you mean 'sales'\" in str(exc), str(exc)
+                  else:
+                      raise AssertionError('expected EngineError with did-you-mean')
+                  # history captures the events
+                  hist = engine.history(last_n=20)
+                  assert any(e.event_type == 'register' for e in hist)
+                  assert any('aggregate' in e.detail for e in hist)
+          print(f'kaos-tabular {kaos_tabular.__version__}: public API OK')
+          "
+          # Exercise both CLI entrypoints.
+          /tmp/smoke/bin/kaos-tabular --help
+          /tmp/smoke/bin/kaos-tabular-serve --help
+
+      - name: Upload distribution artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/
+          retention-days: 7

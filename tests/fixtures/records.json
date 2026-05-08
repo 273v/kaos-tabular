@@ -1,0 +1,7 @@
+[
+  {"id": 1, "name": "Alice", "amount": 1234.56, "date": "2024-01-15", "active": true},
+  {"id": 2, "name": "Bob", "amount": 789.01, "date": "2024-02-20", "active": false},
+  {"id": 3, "name": "Charlie", "amount": 2345.67, "date": "2024-03-10", "active": true},
+  {"id": 4, "name": "Diana", "amount": 456.78, "date": "2024-04-05", "active": true},
+  {"id": 5, "name": "Eve", "amount": 3456.89, "date": "2024-05-12", "active": false}
+]

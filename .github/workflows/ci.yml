@@ -19,7 +19,7 @@ jobs:
   # are easy to spot without combing through test output.
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: kaos-x64-16core
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -52,7 +52,7 @@ jobs:
   # job still enforces the contract on the PR.
   pre-commit:
     name: Pre-commit hooks
-    runs-on: ubuntu-latest
+    runs-on: kaos-x64-16core
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -76,7 +76,7 @@ jobs:
   # ────────────── test ──────────────
   test:
     name: Test (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    runs-on: kaos-x64-16core
     # Stable matrix entries gate PRs; experimental entries
     # (3.14t free-threaded, 3.15-dev pre-release) are informational
     # only — the matrix `experimental: true` flag flips
@@ -175,7 +175,7 @@ jobs:
   # for very old dep versions.
   min-deps:
     name: Test against minimum dependencies
-    runs-on: ubuntu-latest
+    runs-on: kaos-x64-16core
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -206,7 +206,7 @@ jobs:
   # ────────────── build + wheel smoke test ──────────────
   build:
     name: Build distribution + smoke test
-    runs-on: ubuntu-latest
+    runs-on: kaos-x64-16core
     # Build only depends on the fast quality gates (lint + pre-commit
     # + min-deps), NOT the matrix. ``kaos-tabular`` is pure Python — we
     # ship one universal ``py3-none-any.whl`` regardless of interpreter

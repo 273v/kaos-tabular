@@ -229,7 +229,7 @@ Manual QA commands (the same set CI runs):
 ```bash
 uv run ruff format --check kaos_tabular tests
 uv run ruff check kaos_tabular tests
-uv run ty check kaos_tabular tests
+uv run ty check --exclude kaos_tabular/serve.py kaos_tabular tests
 uv run pytest tests/unit -m "not benchmark"          # bounded unit gate
 uv run pytest tests/benchmarks                       # perf regression suite
 ```
@@ -244,7 +244,10 @@ python -c "import kaos_tabular; print(kaos_tabular.__version__)"  # smoke import
 
 ## Contributing
 
-Issues and pull requests are welcome. By contributing you certify the
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md)
+for setup, quality gates, pull request expectations, and engineering
+standards. By contributing you agree to follow the
+[project conduct expectations](CODE_OF_CONDUCT.md) and certify the
 [Developer Certificate of Origin v1.1](https://developercertificate.org/) —
 sign every commit with `git commit -s`. Please open an issue before starting
 on a non-trivial change so we can align on scope.

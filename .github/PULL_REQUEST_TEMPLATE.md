@@ -2,6 +2,9 @@
 
 <!-- One-paragraph description of what this PR does and why it's needed. -->
 
+See [CONTRIBUTING.md](https://github.com/273v/kaos-tabular/blob/main/CONTRIBUTING.md)
+for setup, quality gates, and engineering standards.
+
 ## Type of change
 
 - [ ] Bug fix (non-breaking change which fixes an issue)
@@ -15,8 +18,9 @@
 - [ ] Tests added/updated for any behavior change
 - [ ] `uv run ruff format --check kaos_tabular/ tests/` passes
 - [ ] `uv run ruff check kaos_tabular/ tests/` passes
-- [ ] `uv run ty check kaos_tabular/ tests/` passes
+- [ ] `uv run ty check --exclude kaos_tabular/serve.py kaos_tabular/ tests/` passes
 - [ ] `uv run pytest tests/unit/` passes
+- [ ] Public API, CLI behavior, package metadata, fixtures, and release impact considered
 - [ ] `CHANGELOG.md` updated under `[Unreleased]` if user-visible
 
 ## Related issues

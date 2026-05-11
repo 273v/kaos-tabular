@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Documented the SQL-quoting safety contract on six query sites in
+  ``engine.py`` (bandit B608).** ``TabularEngine`` builds SQL via
+  f-strings against table/column/path inputs and routes every dynamic
+  fragment through one of two validating quoters:
+  ``_quote_ident`` (validates + double-quotes the identifier) or
+  ``_q_lit`` (doubles single quotes for SQL string literals). Bandit's
+  static B608 heuristic can't see the quoter — it just sees an
+  f-string concatenating SQL fragments — so every call site is
+  flagged as a possible SQL-injection vector. Added inline
+  ``# nosec B608`` comments at each site with a one-line justification
+  pointing at the relevant quoter; the quoting contract itself is
+  unchanged. Files: ``kaos_tabular/engine.py``.
+
 ## [0.1.0a1] — 2026-05-08
 
 ### Added (structured shape tools + did-you-mean error suggestions)

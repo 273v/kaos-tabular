@@ -312,9 +312,12 @@ class TabularEngine:
         # controls those names).
         escaped = _q_lit(str(path))
 
-        # List tables in the SQLite database
+        # List tables in the SQLite database. ``escaped`` is the source
+        # SQLite file path, already quoted via ``_q_lit`` above; the
+        # second argument is the literal string ``'sqlite_master'``. No
+        # attacker-controlled fragment is interpolated raw.
         tables_result = self._con.execute(
-            f"SELECT name FROM sqlite_scan({escaped}, 'sqlite_master') "
+            f"SELECT name FROM sqlite_scan({escaped}, 'sqlite_master') "  # nosec B608
             f"WHERE type='table' ORDER BY name"
         ).fetchall()
 
@@ -323,18 +326,22 @@ class TabularEngine:
             raise ValueError(msg)
 
         if len(tables_result) == 1:
-            # Single table: use requested name
+            # Single table: use requested name. All three interpolations
+            # below are passed through validating quoters:
+            # ``_quote_ident`` (identifier — validates + double-quotes),
+            # ``_q_lit`` (string literal — doubles single quotes).
             src_table = tables_result[0][0]
             self._con.execute(
-                f"CREATE OR REPLACE TABLE {_quote_ident(name)} AS "
+                f"CREATE OR REPLACE TABLE {_quote_ident(name)} AS "  # nosec B608
                 f"SELECT * FROM sqlite_scan({escaped}, {_q_lit(src_table)})"
             )
         else:
-            # Multiple tables: register each
+            # Multiple tables: register each. Same quoting contract as
+            # the single-table branch above.
             for (src_table,) in tables_result:
                 tgt = f"{name}_{src_table}" if name != path.stem else src_table
                 self._con.execute(
-                    f"CREATE OR REPLACE TABLE {_quote_ident(tgt)} AS "
+                    f"CREATE OR REPLACE TABLE {_quote_ident(tgt)} AS "  # nosec B608
                     f"SELECT * FROM sqlite_scan({escaped}, {_q_lit(src_table)})"
                 )
                 if tgt != name:
@@ -410,7 +417,12 @@ class TabularEngine:
     def count(self, table_name: str) -> int:
         """Return the row count for a table."""
         self._assert_table_exists(table_name, op="count")
-        result = self._con.execute(f"SELECT COUNT(*) FROM {_quote_ident(table_name)}").fetchone()
+        # ``_quote_ident`` validates + double-quotes the identifier.
+        # ``_assert_table_exists`` rejects any name not currently
+        # registered, so this is also bounded by the catalog.
+        result = self._con.execute(
+            f"SELECT COUNT(*) FROM {_quote_ident(table_name)}"  # nosec B608
+        ).fetchone()
         return result[0] if result else 0
 
     def sample(self, table_name: str, n: int = 5) -> Table:
@@ -423,8 +435,12 @@ class TabularEngine:
 
     def _column_names(self, table_name: str) -> list[str]:
         """Return the registered columns of ``table_name`` (DuckDB catalog)."""
+        # ``_q_lit`` quotes the value as a SQL string literal (doubles
+        # single quotes). The query reads ``information_schema.columns``
+        # which is itself read-only — even a hostile ``table_name``
+        # cannot mutate state through this query.
         rows = self._con.execute(
-            "SELECT column_name FROM information_schema.columns "
+            "SELECT column_name FROM information_schema.columns "  # nosec B608
             f"WHERE table_name = {_q_lit(table_name)} "
             "ORDER BY ordinal_position"
         ).fetchall()
@@ -432,8 +448,9 @@ class TabularEngine:
 
     def _numeric_column_names(self, table_name: str) -> list[str]:
         """Return columns of ``table_name`` whose DuckDB type is numeric."""
+        # Same safety contract as ``_column_names`` above.
         rows = self._con.execute(
-            "SELECT column_name FROM information_schema.columns "
+            "SELECT column_name FROM information_schema.columns "  # nosec B608
             f"WHERE table_name = {_q_lit(table_name)} "
             "  AND data_type IN ('TINYINT', 'SMALLINT', 'INTEGER', 'BIGINT', "
             "                    'HUGEINT', 'UTINYINT', 'USMALLINT', 'UINTEGER', "
@@ -453,8 +470,10 @@ class TabularEngine:
         return [r[0] for r in rows]
 
     def _table_exists(self, name: str) -> bool:
+        # ``_q_lit`` quotes the value as a SQL string literal; read-only
+        # query against ``information_schema.tables``.
         rows = self._con.execute(
-            "SELECT 1 FROM information_schema.tables "
+            "SELECT 1 FROM information_schema.tables "  # nosec B608
             f"WHERE table_schema = 'main' AND table_name = {_q_lit(name)} LIMIT 1"
         ).fetchall()
         return bool(rows)

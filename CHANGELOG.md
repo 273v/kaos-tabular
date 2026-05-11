@@ -21,6 +21,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ``# nosec B608`` comments at each site with a one-line justification
   pointing at the relevant quoter; the quoting contract itself is
   unchanged. Files: ``kaos_tabular/engine.py``.
+- **bandit + vulture now run in both pre-commit and CI.** Two new
+  hooks in ``.pre-commit-config.yaml`` (bandit + vulture), mirrored
+  by two new jobs in ``security.yml`` (``bandit (static security)``
+  + ``vulture (dead-code scan)``). Pre-commit gives contributors fast
+  feedback before push; CI makes the scan publicly visible on every
+  PR. Skip lists justified inline. Mirrors the rollout from
+  kaos-core. **Depends on PR #1** (bandit B608 nosec justifications
+  in engine.py) — bandit will fail on this branch's first run until
+  #1 merges, then rebase clears it.
 
 ## [0.1.0a1] — 2026-05-08
 

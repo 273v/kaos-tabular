@@ -30,6 +30,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   kaos-core. **Depends on PR #1** (bandit B608 nosec justifications
   in engine.py) — bandit will fail on this branch's first run until
   #1 merges, then rebase clears it.
+### Changed
+
+- **uv.lock bumped to the current PyPI-latest of three kaos-* siblings:**
+  ``kaos-content`` 0.1.0a2 → 0.1.0a4, ``kaos-core`` 0.1.0a4 →
+  0.1.0a5, and ``kaos-mcp`` 0.1.0a1 → 0.1.0a2. All three bumps are
+  no-op for kaos-tabular's public API. 276 unit tests continue to
+  pass.
 
 ## [0.1.0a1] — 2026-05-08
 

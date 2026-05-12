@@ -258,7 +258,7 @@ class TestPathTraversal:
 
     def test_relative_path_traversal(self, engine: TabularEngine) -> None:
         with pytest.raises(FileNotFoundError):
-            engine.register_file("../../../etc/passwd")
+            engine.register_file("../../../__kaos_tabular_missing__/passwd.csv")
 
     def test_null_byte_in_path(self, engine: TabularEngine) -> None:
         with pytest.raises((FileNotFoundError, ValueError, OSError)):

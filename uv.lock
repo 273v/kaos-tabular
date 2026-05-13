@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.13"
 
 [options]
-exclude-newer = "2026-05-09T01:46:02.554369451Z"
+exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "PT72H"
 
 [options.exclude-newer-package]
@@ -375,16 +375,16 @@ wheels = [
 
 [[package]]
 name = "kaos-content"
-version = "0.1.0a4"
+version = "0.1.0a6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "kaos-core" },
     { name = "pydantic" },
     { name = "uuid6", marker = "python_full_version < '3.14'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/37/29/9875a47501c8ae8e9364114ba9112c1c8ec3886f9fd46898b3ee9f9e0a78/kaos_content-0.1.0a4.tar.gz", hash = "sha256:6969647304f87c35619f7f35d49844a782cd139bbddd74709ba572f6650024e7", size = 1027442, upload-time = "2026-05-10T10:34:43.575Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/95/58/0adf782bff420a7e83925a7506a13ba5c08933713075e95ce75fbae6dbff/kaos_content-0.1.0a6.tar.gz", hash = "sha256:7b6b175183fd1fd8bfb922d3adccab8dfcee57cc4a9b35eecb957390b3c8f240", size = 1065482, upload-time = "2026-05-11T12:53:23.494Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/34/65/32cd2451c09775e2644c06b156eca847162d5139da662d66b9c2fe22924e/kaos_content-0.1.0a4-py3-none-any.whl", hash = "sha256:d8cbfd811c979d268747bef42d7ec482a135cc8220c011fb80dc90296b46028b", size = 237190, upload-time = "2026-05-10T10:34:41.858Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/8b/a4b182c0e12eab8e28f14fb6c097d5519cf68de24353d1c1c20501e9d57c/kaos_content-0.1.0a6-py3-none-any.whl", hash = "sha256:3ce3d724396f7e127cc8c951ff5862700a5d6f2063e2a33e3dcf09b7006674d9", size = 258521, upload-time = "2026-05-11T12:53:21.607Z" },
 ]
 
 [package.optional-dependencies]

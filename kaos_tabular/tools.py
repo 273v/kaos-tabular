@@ -757,6 +757,7 @@ class FindDuplicatesTool(KaosTool):
                         "(full-row duplicates)."
                     ),
                     required=False,
+                    constraints={"items": {"type": "string"}},
                 ),
             ],
         )
@@ -821,6 +822,7 @@ class CorrelationTool(KaosTool):
                         "in the table."
                     ),
                     required=False,
+                    constraints={"items": {"type": "string"}},
                 ),
             ],
         )
@@ -889,6 +891,7 @@ class JoinTool(KaosTool):
                         "Column name(s) shared by both tables. Required unless how='cross'."
                     ),
                     required=False,
+                    constraints={"items": {"type": "string"}},
                 ),
                 ParameterSchema(
                     name="how",
@@ -992,6 +995,7 @@ class PivotTool(KaosTool):
                     type="array",
                     description="Columns to group by. Default: none (single row).",
                     required=False,
+                    constraints={"items": {"type": "string"}},
                 ),
                 ParameterSchema(
                     name="target",
@@ -1068,6 +1072,7 @@ class UnpivotTool(KaosTool):
                     name="columns",
                     type="array",
                     description="Columns to melt into rows. Must be at least one.",
+                    constraints={"items": {"type": "string"}, "minItems": 1},
                 ),
                 ParameterSchema(
                     name="name_column",
@@ -1248,6 +1253,33 @@ class AggregateTool(KaosTool):
                         "variance / first / last. column='*' is only legal with func='count'. "
                         "alias names the output column for use in order_by."
                     ),
+                    constraints={
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "func": {
+                                    "type": "string",
+                                    "enum": [
+                                        "sum",
+                                        "avg",
+                                        "min",
+                                        "max",
+                                        "count",
+                                        "count_distinct",
+                                        "median",
+                                        "stddev",
+                                        "variance",
+                                        "first",
+                                        "last",
+                                    ],
+                                },
+                                "column": {"type": "string"},
+                                "alias": {"type": "string"},
+                            },
+                            "required": ["func", "column"],
+                        },
+                        "minItems": 1,
+                    },
                 ),
                 ParameterSchema(
                     name="group_by",
@@ -1257,6 +1289,7 @@ class AggregateTool(KaosTool):
                         "whole table."
                     ),
                     required=False,
+                    constraints={"items": {"type": "string"}},
                 ),
                 ParameterSchema(
                     name="where",
@@ -1285,6 +1318,16 @@ class AggregateTool(KaosTool):
                         "'desc'. Default direction is 'asc'."
                     ),
                     required=False,
+                    constraints={
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "column": {"type": "string"},
+                                "direction": {"type": "string", "enum": ["asc", "desc"]},
+                            },
+                            "required": ["column"],
+                        }
+                    },
                 ),
                 ParameterSchema(
                     name="limit",
@@ -1468,6 +1511,7 @@ class TopKTool(KaosTool):
                         "Column name(s) to order by. Accepts a single string or a list. "
                         "All columns must exist on the table."
                     ),
+                    constraints={"items": {"type": "string"}, "minItems": 1},
                 ),
                 ParameterSchema(
                     name="n",

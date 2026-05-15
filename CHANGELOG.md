@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Nine array parameters across the MCP tool catalog now declare
+  their element types.** Each was previously `type=array` with no
+  `items`, which OpenAI's strict JSON Schema validator rejected
+  with HTTP 400 `invalid_function_parameters`, taking down the
+  whole tool catalog for openai-provider turns. Per-tool fixes:
+  - `kaos-tabular-dedupe.columns`, `-correlate.columns`,
+    `-melt.columns`, `-join.on`, `-pivot.group_by`,
+    `-aggregate.group_by`, `-top-n.by` → `items: {type: "string"}`.
+  - `kaos-tabular-aggregate.aggregates` → typed object schema
+    `{func: enum[sum/avg/min/max/count/count_distinct/median/stddev/
+    variance/first/last], column: string, alias?: string}`. The
+    LLM now produces correct payloads on the first try instead of
+    trial-and-erroring across two ReAct iterations.
+  - `kaos-tabular-aggregate.order_by` → typed object schema
+    `{column: string, direction?: enum[asc/desc]}`.
+  kaos-core 0.1.0a7's defensive `items: {}` floor is belt +
+  suspenders.
+
 ### Security
 
 - **Documented the SQL-quoting safety contract on six query sites in

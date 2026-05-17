@@ -70,7 +70,12 @@ class TestRegisterTool:
         result = await tool.execute({"path": "/nonexistent/file.csv"})
         assert result.isError
         assert result.text is not None
-        assert "File not found" in result.text
+        # After Stage 3 of vfs-blind-tools-audit-and-fix-plan.md the
+        # resolver speaks in agent-friendly terms ("not found") rather
+        # than the historical "File not found" phrase. The error must
+        # still surface the missing path so the agent can self-correct.
+        assert "not found" in result.text.lower()
+        assert "/nonexistent/file.csv" in result.text
 
     @pytest.mark.asyncio
     async def test_metadata(self) -> None:

@@ -137,7 +137,13 @@ class TestRegisterTool:
         result = await tool.execute({"path": "/nonexistent/data.csv"})
 
         assert result.isError
-        assert "File not found" in (result.text or "")
+        text = result.text or ""
+        # After Stage 3 of vfs-blind-tools-audit-and-fix-plan.md the
+        # path resolver emits "not found" rather than the historical
+        # "File not found" phrase; the path must still appear so the
+        # agent can self-correct.
+        assert "not found" in text.lower()
+        assert "/nonexistent/data.csv" in text
 
     async def test_register_message_includes_guidance(self, test_csv: Path) -> None:
         tool = RegisterTool()

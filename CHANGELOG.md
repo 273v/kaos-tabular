@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Both file-input MCP tools — `kaos-tabular-register` and
+  `kaos-tabular-read-file` — now route agent-supplied paths through
+  `kaos_core.path_resolver.resolve_input_path` instead of raw
+  `Path(p).exists()`.** Both tools accept four input shapes for the
+  `path` argument: an absolute filesystem path (CLI / tests), a
+  `kaos://artifacts/<id>` URI returned by a previous tool, a `kaos://`
+  VFS URI, and a session-scoped VFS-relative path (e.g. a CSV uploaded
+  through a host UI like `kaos-ui`'s single-user-chat SPA). Both
+  tools'`path` parameter schema now documents these four shapes so the
+  LLM can discover the feature without reading source. Implements
+  Stage 3 of `kaos-modules/docs/plans/vfs-blind-tools-audit-and-fix-plan.md`;
+  closes the kaos-tabular slice of the production NDA-hallucination
+  incident (session `01KRVYAEA3B1HG95DBAG6H0DJ3`) where file-input
+  tools could not see SPA uploads and the agent fabricated a
+  jurisdiction / term-length analysis citing the unreadable files. The
+  resolver performs the artifact-store / VFS reads inside an `async
+  with` context manager; bytes are materialised to a temp file just
+  for the duration of the eager DuckDB `CREATE TABLE ... AS SELECT *
+  FROM read_csv(...)` (register) or the synchronous `_read_file`
+  build (read-file), then cleaned up. On `InputPathResolutionError`
+  both tools return the resolver's agent-friendly three-part message
+  via `ToolResult.create_error(exc.to_agent_message())`. When the
+  input was itself a `kaos://artifacts/<id>` URI, the existing
+  artifact id round-trips into `structured_content` so downstream
+  tools and the SPA's `ArtifactCard` can re-resolve the same handle.
+- **`kaos-core` dependency floor raised from `>=0.1.0a4` to
+  `>=0.1.0a9`** to pick up `kaos_core.path_resolver` (released in
+  kaos-core 0.1.0a9).
+
 ## [0.1.0a2] — 2026-05-15
 
 ### Fixed

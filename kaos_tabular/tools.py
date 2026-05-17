@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 
 from kaos_core.base.tool import KaosTool
 from kaos_core.logging import get_logger
+from kaos_core.path_resolver import InputPathResolutionError, ResolvedOrigin
 from kaos_core.types.annotations import ToolAnnotations
 from kaos_core.types.enums import ToolCapability, ToolCategory
 from kaos_core.types.metadata import ToolMetadata
@@ -21,6 +22,7 @@ if TYPE_CHECKING:
     from kaos_core.base.context import KaosContext
     from kaos_core.registry.container import KaosRuntime
 
+from kaos_tabular._path_resolver import resolve_tabular_input
 from kaos_tabular._session import SESSION_REGISTRY
 from kaos_tabular.engine import TabularEngine
 from kaos_tabular.errors import EngineError
@@ -138,7 +140,12 @@ class RegisterTool(KaosTool):
                 ParameterSchema(
                     name="path",
                     type="string",
-                    description="Path to the data file (CSV, TSV, Parquet, JSON, JSONL).",
+                    description=(
+                        "Path to the data file (CSV, TSV, Parquet, JSON, JSONL, SQLite). "
+                        "Accepts: an absolute filesystem path, a kaos://artifacts/<id> URI "
+                        "returned by a previous tool, a kaos:// VFS URI, or a session-scoped "
+                        "VFS-relative path (e.g. files uploaded through the host UI)."
+                    ),
                 ),
                 ParameterSchema(
                     name="table_name",
@@ -155,32 +162,33 @@ class RegisterTool(KaosTool):
         path = inputs["path"]
         table_name = inputs.get("table_name")
 
-        if not Path(path).exists():
-            return ToolResult.create_error(
-                f"File not found: {path}. "
-                f"How to fix: pass an absolute path or one relative to the runtime's "
-                f"working directory; verify the file exists. "
-                f"Alternative: use kaos-tabular-list-tables to see what is already registered."
-            )
-
+        # ``resolve_tabular_input`` handles all four input shapes
+        # (artifact URI / kaos:// URI / VFS-relative / absolute path)
+        # and returns a real on-disk path. DuckDB's
+        # ``CREATE TABLE ... AS SELECT * FROM read_csv(...)`` is eager:
+        # ``register_file`` materialises all rows into a DuckDB table
+        # at register time, so once we exit the ``async with`` the
+        # temp file can disappear without breaking subsequent queries.
+        # The decision is to eagerly load while the resolver context
+        # is still open rather than persist a longer-lived copy.
         try:
-            engine = await _get_engine(context)
-            name = engine.register_file(path, table_name=table_name)
-            desc = engine.describe_table(name)
-
-            return ToolResult.create_success(
-                output={
-                    "table_name": name,
-                    "row_count": desc["row_count"],
-                    "column_count": desc["column_count"],
-                    "columns": desc["columns"],
-                    "message": (
-                        f"Registered '{name}' ({desc['row_count']} rows, "
-                        f"{desc['column_count']} columns). "
-                        "Use kaos-tabular-query to run SQL against it."
-                    ),
-                }
-            )
+            async with resolve_tabular_input(path, context) as resolved:
+                engine = await _get_engine(context)
+                # The resolver materialises VFS / artifact inputs to a
+                # private temp file whose stem looks like
+                # ``kaos-input-XXXXXX`` — useless as a table name.
+                # Fall back to the original ``path`` stem when the
+                # caller didn't supply ``table_name`` so the
+                # registered table is named after the file the agent
+                # actually asked for.
+                effective_name = table_name or Path(path).stem
+                name = engine.register_file(resolved.path, table_name=effective_name)
+                desc = engine.describe_table(name)
+                artifact_id = (
+                    resolved.artifact_id if resolved.origin is ResolvedOrigin.ARTIFACT else None
+                )
+        except InputPathResolutionError as exc:
+            return ToolResult.create_error(exc.to_agent_message())
         except ValueError as exc:
             return ToolResult.create_error(
                 f"Failed to register file {path!r}: {exc}. "
@@ -194,8 +202,26 @@ class RegisterTool(KaosTool):
             return ToolResult.create_error(
                 f"Failed to register '{Path(path).name}': {exc}. "
                 "The file may be corrupted or in an unsupported format. "
-                "Supported: CSV, TSV, Parquet, JSON, JSONL."
+                "Supported: CSV, TSV, Parquet, JSON, JSONL, SQLite."
             )
+
+        # The artifact id (if any) round-trips into the structured
+        # response so a downstream tool can re-resolve the same upload
+        # by handle rather than path-guessing.
+        output: dict[str, Any] = {
+            "table_name": name,
+            "row_count": desc["row_count"],
+            "column_count": desc["column_count"],
+            "columns": desc["columns"],
+            "message": (
+                f"Registered '{name}' ({desc['row_count']} rows, "
+                f"{desc['column_count']} columns). "
+                "Use kaos-tabular-query to run SQL against it."
+            ),
+        }
+        if artifact_id is not None:
+            output["artifact_id"] = artifact_id
+        return ToolResult.create_success(output=output)
 
 
 # ---------------------------------------------------------------------------
@@ -509,7 +535,12 @@ class ReadFileTool(KaosTool):
                 ParameterSchema(
                     name="path",
                     type="string",
-                    description="Path to the data file.",
+                    description=(
+                        "Path to the data file. "
+                        "Accepts: an absolute filesystem path, a kaos://artifacts/<id> URI "
+                        "returned by a previous tool, a kaos:// VFS URI, or a session-scoped "
+                        "VFS-relative path (e.g. files uploaded through the host UI)."
+                    ),
                 ),
             ],
         )
@@ -519,14 +550,6 @@ class ReadFileTool(KaosTool):
     ) -> ToolResult:
         path = inputs["path"]
 
-        if not Path(path).exists():
-            return ToolResult.create_error(
-                f"File not found: {path}. "
-                f"How to fix: pass an absolute path or one relative to the runtime's "
-                f"working directory; verify the file exists. "
-                f"Alternative: use kaos-tabular-list-tables to see what is already registered."
-            )
-
         if context is None or context.runtime is None:
             return ToolResult.create_error(
                 "No runtime context available. "
@@ -534,34 +557,72 @@ class ReadFileTool(KaosTool):
                 "Use kaos-tabular-register for context-free operations."
             )
 
+        # ``resolve_tabular_input`` resolves artifact URIs / VFS-relative
+        # paths / absolute paths to a real on-disk file. ``_read_file``
+        # builds the TabularDocument synchronously, so the temp file
+        # only needs to survive until that call returns — eager-load
+        # inside the ``async with`` keeps the temp file cleanup window
+        # tight.
         try:
-            from kaos_content.artifacts import store_tabular
-            from kaos_content.serializers.tabular import serialize_tabular_summary
+            async with resolve_tabular_input(path, context) as resolved:
+                from kaos_content.artifacts import store_tabular
+                from kaos_content.serializers.tabular import serialize_tabular_summary
 
-            from kaos_tabular.readers import _read_file
+                from kaos_tabular.readers import _read_file
 
-            doc = _read_file(path)
-            manifest = await store_tabular(
-                doc,
-                context.runtime,
-                context,
-                name=Path(path).stem,
-                description=f"Read from {Path(path).name}",
-            )
-            summary = serialize_tabular_summary(doc)
-
-            return manifest.to_tool_result(
-                summary=summary,
-                structured_content={
-                    "artifact_id": manifest.artifact_id,
+                # Use the resolved on-disk path. The display name /
+                # description still come from the agent-supplied
+                # ``path`` (or the artifact id when applicable) so the
+                # SPA's ArtifactCard shows the originating filename
+                # rather than the resolver's opaque temp name.
+                display_name = (
+                    resolved.artifact_id
+                    if resolved.origin is ResolvedOrigin.ARTIFACT
+                    and resolved.artifact_id is not None
+                    else Path(path).name
+                )
+                # Pass the original path's stem as the table name so
+                # the TabularDocument carries the file the agent asked
+                # for ("employees") rather than the resolver's
+                # opaque temp stem ("kaos-input-XXXX").
+                table_stem = Path(path).stem or display_name
+                doc = _read_file(resolved.path, table_name=table_stem)
+                manifest = await store_tabular(
+                    doc,
+                    context.runtime,
+                    context,
+                    name=table_stem,
+                    description=f"Read from {display_name}",
+                )
+                summary = serialize_tabular_summary(doc)
+                # Prefer the original artifact id when the input was
+                # itself an artifact reference — re-emitting the same
+                # id lets the agent thread provenance through without a
+                # new opaque handle for the same bytes. The newly
+                # stored TabularDocument artifact id is exposed under
+                # ``tabular_artifact_id`` so both are addressable.
+                artifact_id = (
+                    resolved.artifact_id
+                    if resolved.origin is ResolvedOrigin.ARTIFACT
+                    and resolved.artifact_id is not None
+                    else manifest.artifact_id
+                )
+                structured: dict[str, Any] = {
+                    "artifact_id": artifact_id,
+                    "tabular_artifact_id": manifest.artifact_id,
                     "table_count": len(doc.tables),
                     "total_rows": sum(t.row_count for t in doc.tables),
                     "tables": [
                         {"name": t.name, "row_count": t.row_count, "columns": len(t.columns)}
                         for t in doc.tables
                     ],
-                },
-            )
+                }
+                return manifest.to_tool_result(
+                    summary=summary,
+                    structured_content=structured,
+                )
+        except InputPathResolutionError as exc:
+            return ToolResult.create_error(exc.to_agent_message())
         except Exception as exc:
             return ToolResult.create_error(
                 f"Failed to read {Path(path).name!r}: {exc}. "

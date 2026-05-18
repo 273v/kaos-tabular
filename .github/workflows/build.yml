@@ -1,0 +1,146 @@
+name: build
+
+# Standard `build` lane (per
+# kaos-modules/docs/oss/40-ci-cd/runner-cost-reduction-plan.md):
+# build wheel/sdist, `twine check --strict`, clean-venv smoke install.
+# Linux Python 3.13 on PR / main push / tag. The release workflow
+# (release.yml) is the gated artifact-publish path; this lane is the
+# PR-time smoke that the artifact builds cleanly and the wheel
+# installs.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: build
+    runs-on: kaos-x64-16core
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install Python 3.13
+        run: uv python install 3.13
+
+      - name: Build wheel and sdist
+        run: uv build
+
+      - name: Verify metadata
+        run: uvx --from twine twine check --strict dist/*
+
+      - name: Smoke-test the built wheel in a clean venv
+        # Install the actually-built wheel (not the source tree) into a
+        # clean Python environment and exercise the public API. This
+        # catches packaging bugs that source-tree tests miss: missing
+        # data files, broken `__init__.py` exports, sdist-only files
+        # that reference dist-only paths, etc.
+        run: |
+          uv venv --python 3.13 /tmp/smoke
+          uv pip install --python /tmp/smoke/bin/python dist/kaos_tabular-*-py3-none-any.whl
+          /tmp/smoke/bin/python -c "
+          import kaos_tabular
+          assert kaos_tabular.__version__, 'version missing from wheel'
+          # Public API surface imports without error.
+          from kaos_tabular import (
+              EngineError,
+              KaosTabularError,
+              QueryError,
+              RegistrationError,
+              TabularEngine,
+              read_csv,
+              read_json,
+              read_parquet,
+          )
+          assert kaos_tabular.__all__ == [
+              'EngineError', 'EngineEvent', 'KaosTabularError', 'QueryError',
+              'RegistrationError', 'TabularEngine', '__version__',
+              'read_csv', 'read_json', 'read_parquet',
+          ], kaos_tabular.__all__
+
+          # py.typed marker shipped (audit-01 KTAB-004).
+          import importlib.resources as ir
+          assert ir.files('kaos_tabular').joinpath('py.typed').is_file(), 'py.typed missing'
+
+          # Tool registration: 17 tools (8 core + 6 reshape + 3 structured).
+          from kaos_core import KaosRuntime
+          from kaos_tabular.tools import register_tabular_tools
+          rt = KaosRuntime()
+          n_tools = register_tabular_tools(rt)
+          assert n_tools == 17, f'expected 17 tools, got {n_tools}'
+
+          # Functional: register → query → export → analytical → structured.
+          # The did-you-mean assertion needs a table name long enough that a
+          # single-character typo crosses difflib's 0.6 similarity cutoff —
+          # ``sales`` (5 chars) vs ``saless`` (6 chars) shares 5/6 chars and
+          # comfortably trips it. Short names (`t` vs `tt`) cannot produce a
+          # suggestion under that cutoff by design; see the unit tests under
+          # tests/unit/test_structured_ops.py::TestDidYouMean.
+          import csv, tempfile
+          from pathlib import Path
+          from kaos_tabular.errors import EngineError
+          with tempfile.TemporaryDirectory() as tmp:
+              csv_path = Path(tmp) / 'sales.csv'
+              with csv_path.open('w', newline='') as f:
+                  w = csv.writer(f); w.writerow(['region','units']); w.writerow(['e',1]); w.writerow(['e',1]); w.writerow(['w',2])
+              with TabularEngine() as engine:
+                  engine.register_file(csv_path, table_name='sales')
+                  result = engine.execute('SELECT count(*) AS n FROM sales')
+                  assert result.rows[0][0] == 3
+                  # export_table (KTAB-003)
+                  out = Path(tmp) / 'out.parquet'
+                  n = engine.export_table('sales', out, format='parquet')
+                  assert n == 3 and out.exists()
+                  # find_duplicates (analytical)
+                  dups = engine.find_duplicates('sales')
+                  assert dups.row_count == 2
+                  # aggregate (structured shape ops)
+                  agg = engine.aggregate('sales', aggregates=[('sum','units','total')], group_by=['region'])
+                  assert agg.row_count == 2
+                  # filter (structured shape ops)
+                  flt = engine.filter('sales', where='units > 1')
+                  assert flt.row_count == 1
+                  # top_k (structured shape ops)
+                  topk = engine.top_k('sales', by='units', n=2)
+                  assert topk.row_count == 2
+                  # did-you-mean suggestions: typo'd 'saless' against 'sales'
+                  try:
+                      engine.aggregate('saless', aggregates=[('sum','units')])
+                  except EngineError as exc:
+                      assert \"Did you mean 'sales'\" in str(exc), str(exc)
+                  else:
+                      raise AssertionError('expected EngineError with did-you-mean')
+                  # history captures the events
+                  hist = engine.history(last_n=20)
+                  assert any(e.event_type == 'register' for e in hist)
+                  assert any('aggregate' in e.detail for e in hist)
+          print(f'kaos-tabular {kaos_tabular.__version__}: public API OK')
+          "
+          # Exercise both CLI entrypoints.
+          /tmp/smoke/bin/kaos-tabular --help
+          /tmp/smoke/bin/kaos-tabular-serve --help
+
+      - name: Upload distribution artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/
+          retention-days: 7

@@ -40,7 +40,7 @@ jobs:
         run: uv python install 3.13
 
       - name: Install dependencies
-        run: uv sync --group dev --python 3.13
+        run: uv sync --group dev --group dev-mcp --python 3.13
 
       - name: Ruff format check
         run: uv run ruff format --check kaos_tabular/ tests/

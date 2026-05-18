@@ -37,7 +37,7 @@ jobs:
         run: uv python install 3.13
 
       - name: Install with lowest-direct resolution
-        run: uv sync --group dev --resolution=lowest-direct --python 3.13
+        run: uv sync --group dev --group dev-mcp --resolution=lowest-direct --python 3.13
 
       - name: Run tests
         run: uv run pytest -m "not live and not network and not slow" --no-cov -q

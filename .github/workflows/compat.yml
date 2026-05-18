@@ -69,7 +69,7 @@ jobs:
         run: uv python install --preview ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync --group dev --python ${{ matrix.python-version }}
+        run: uv sync --group dev --group dev-mcp --python ${{ matrix.python-version }}
 
       - name: Run tests
         shell: bash

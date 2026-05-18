@@ -60,7 +60,7 @@ jobs:
         run: uv python install 3.13
 
       - name: Sync dependencies
-        run: uv sync --group dev --python 3.13
+        run: uv sync --group dev --group dev-mcp --python 3.13
 
       - name: Export dependency set
         run: uv export --no-hashes --no-emit-project --format requirements-txt > /tmp/requirements.txt

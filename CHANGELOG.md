@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0a4] — 2026-05-17
+
+### Changed
+
+- **kaos-core floor raised to `>=0.1.0a10`** to pick up the URI
+  contract redesign. Pass-through for kaos-tabular file-input tools.
+  See `kaos-modules/docs/plans/uri-contract-redesign.md`.
+
 ## [0.1.0a3] — 2026-05-17
 
 ### Changed

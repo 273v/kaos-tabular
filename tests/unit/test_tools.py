@@ -50,7 +50,11 @@ class TestRegisterTool:
     @pytest.mark.asyncio
     async def test_register_csv(self, simple_csv: Path) -> None:
         tool = RegisterTool()
-        result = await tool.execute({"path": str(simple_csv)})
+        # URI contract redesign (kaos-core 0.1.0a10): file inputs must
+        # carry an explicit scheme. Bare absolute paths are rejected at
+        # the resolver. Use ``Path.as_uri()`` to produce a ``file:///``
+        # URI.
+        result = await tool.execute({"path": simple_csv.as_uri()})
         assert not result.isError
         structured = result.require_structured()
         assert structured["table_name"] == "simple"
@@ -60,14 +64,17 @@ class TestRegisterTool:
     @pytest.mark.asyncio
     async def test_register_custom_name(self, simple_csv: Path) -> None:
         tool = RegisterTool()
-        result = await tool.execute({"path": str(simple_csv), "table_name": "my_table"})
+        result = await tool.execute({"path": simple_csv.as_uri(), "table_name": "my_table"})
         assert not result.isError
         assert result.require_structured()["table_name"] == "my_table"
 
     @pytest.mark.asyncio
     async def test_register_missing_file(self) -> None:
         tool = RegisterTool()
-        result = await tool.execute({"path": "/nonexistent/file.csv"})
+        # URI contract redesign (kaos-core 0.1.0a10): use a file:// URI
+        # so the resolver reaches the filesystem-not-found branch rather
+        # than rejecting the bare path at the scheme check.
+        result = await tool.execute({"path": "file:///nonexistent/file.csv"})
         assert result.isError
         assert result.text is not None
         # After Stage 3 of vfs-blind-tools-audit-and-fix-plan.md the

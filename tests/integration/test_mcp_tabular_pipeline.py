@@ -101,7 +101,7 @@ class TestRegisterTool:
     async def test_register_csv(self, test_csv: Path) -> None:
         tool = RegisterTool()
         ctx = _context("register-csv")
-        result = await tool.execute({"path": str(test_csv)}, context=ctx)
+        result = await tool.execute({"path": test_csv.as_uri()}, context=ctx)
 
         assert not result.isError, f"Register failed: {result.text}"
         data = result.require_structured()
@@ -114,7 +114,7 @@ class TestRegisterTool:
         tool = RegisterTool()
         ctx = _context("register-custom")
         result = await tool.execute(
-            {"path": str(test_csv), "table_name": "staff"},
+            {"path": test_csv.as_uri(), "table_name": "staff"},
             context=ctx,
         )
 
@@ -125,7 +125,7 @@ class TestRegisterTool:
     async def test_register_json(self, test_json: Path) -> None:
         tool = RegisterTool()
         ctx = _context("register-json")
-        result = await tool.execute({"path": str(test_json)}, context=ctx)
+        result = await tool.execute({"path": test_json.as_uri()}, context=ctx)
 
         assert not result.isError
         data = result.require_structured()
@@ -134,7 +134,11 @@ class TestRegisterTool:
 
     async def test_register_missing_file(self) -> None:
         tool = RegisterTool()
-        result = await tool.execute({"path": "/nonexistent/data.csv"})
+        # URI contract redesign (kaos-core 0.1.0a10): file inputs must
+        # carry an explicit scheme. Use a ``file://`` URI so the
+        # resolver reaches the filesystem-not-found branch rather than
+        # rejecting the bare path at the scheme check.
+        result = await tool.execute({"path": "file:///nonexistent/data.csv"})
 
         assert result.isError
         text = result.text or ""
@@ -148,7 +152,7 @@ class TestRegisterTool:
     async def test_register_message_includes_guidance(self, test_csv: Path) -> None:
         tool = RegisterTool()
         ctx = _context("register-msg")
-        result = await tool.execute({"path": str(test_csv)}, context=ctx)
+        result = await tool.execute({"path": test_csv.as_uri()}, context=ctx)
 
         data = result.require_structured()
         assert "kaos-tabular-query" in data["message"]
@@ -165,7 +169,7 @@ class TestQueryTool:
 
     async def test_basic_select(self, test_csv: Path) -> None:
         ctx = _context("query-basic")
-        await RegisterTool().execute({"path": str(test_csv)}, context=ctx)
+        await RegisterTool().execute({"path": test_csv.as_uri()}, context=ctx)
 
         result = await QueryTool().execute(
             {"sql": "SELECT * FROM employees"},
@@ -178,7 +182,7 @@ class TestQueryTool:
 
     async def test_aggregation(self, test_csv: Path) -> None:
         ctx = _context("query-agg")
-        await RegisterTool().execute({"path": str(test_csv)}, context=ctx)
+        await RegisterTool().execute({"path": test_csv.as_uri()}, context=ctx)
 
         result = await QueryTool().execute(
             {
@@ -197,7 +201,7 @@ class TestQueryTool:
 
     async def test_where_clause(self, test_csv: Path) -> None:
         ctx = _context("query-where")
-        await RegisterTool().execute({"path": str(test_csv)}, context=ctx)
+        await RegisterTool().execute({"path": test_csv.as_uri()}, context=ctx)
 
         result = await QueryTool().execute(
             {"sql": "SELECT name, salary FROM employees WHERE salary > 100000 ORDER BY salary"},
@@ -222,7 +226,7 @@ class TestQueryTool:
 
     async def test_query_bad_sql_error(self, test_csv: Path) -> None:
         ctx = _context("query-bad-sql")
-        await RegisterTool().execute({"path": str(test_csv)}, context=ctx)
+        await RegisterTool().execute({"path": test_csv.as_uri()}, context=ctx)
 
         result = await QueryTool().execute(
             {"sql": "SELECT nonexistent_col FROM employees"},
@@ -233,7 +237,7 @@ class TestQueryTool:
 
     async def test_max_rows_limit(self, test_csv: Path) -> None:
         ctx = _context("query-limit")
-        await RegisterTool().execute({"path": str(test_csv)}, context=ctx)
+        await RegisterTool().execute({"path": test_csv.as_uri()}, context=ctx)
 
         result = await QueryTool().execute(
             {"sql": "SELECT * FROM employees", "max_rows": 3},
@@ -264,7 +268,7 @@ class TestListTablesTool:
 
     async def test_list_after_register(self, test_csv: Path) -> None:
         ctx = _context("list-one")
-        await RegisterTool().execute({"path": str(test_csv)}, context=ctx)
+        await RegisterTool().execute({"path": test_csv.as_uri()}, context=ctx)
 
         result = await ListTablesTool().execute({}, context=ctx)
         assert not result.isError
@@ -279,7 +283,7 @@ class TestListTablesTool:
     ) -> None:
         ctx = _context("list-multi")
         reg = RegisterTool()
-        await reg.execute({"path": str(test_csv), "table_name": "csv_data"}, context=ctx)
+        await reg.execute({"path": test_csv.as_uri(), "table_name": "csv_data"}, context=ctx)
 
         # Create a second CSV with different data
         second_csv = tmp_path / "departments.csv"
@@ -292,7 +296,7 @@ class TestListTablesTool:
                     {"dept": "Marketing", "budget": 200000},
                 ]
             )
-        await reg.execute({"path": str(second_csv), "table_name": "budgets"}, context=ctx)
+        await reg.execute({"path": second_csv.as_uri(), "table_name": "budgets"}, context=ctx)
 
         result = await ListTablesTool().execute({}, context=ctx)
         data = result.require_structured()
@@ -313,7 +317,7 @@ class TestDescribeTool:
 
     async def test_describe_schema(self, test_csv: Path) -> None:
         ctx = _context("describe-schema")
-        await RegisterTool().execute({"path": str(test_csv)}, context=ctx)
+        await RegisterTool().execute({"path": test_csv.as_uri()}, context=ctx)
 
         result = await DescribeTool().execute(
             {"table_name": "employees"},
@@ -332,7 +336,7 @@ class TestDescribeTool:
 
     async def test_describe_nonexistent_table(self, test_csv: Path) -> None:
         ctx = _context("describe-missing")
-        await RegisterTool().execute({"path": str(test_csv)}, context=ctx)
+        await RegisterTool().execute({"path": test_csv.as_uri()}, context=ctx)
 
         result = await DescribeTool().execute(
             {"table_name": "nonexistent"},
@@ -353,7 +357,7 @@ class TestSampleTool:
 
     async def test_sample_default(self, test_csv: Path) -> None:
         ctx = _context("sample-default")
-        await RegisterTool().execute({"path": str(test_csv)}, context=ctx)
+        await RegisterTool().execute({"path": test_csv.as_uri()}, context=ctx)
 
         result = await SampleTool().execute(
             {"table_name": "employees"},
@@ -367,7 +371,7 @@ class TestSampleTool:
 
     async def test_sample_custom_n(self, test_csv: Path) -> None:
         ctx = _context("sample-n")
-        await RegisterTool().execute({"path": str(test_csv)}, context=ctx)
+        await RegisterTool().execute({"path": test_csv.as_uri()}, context=ctx)
 
         result = await SampleTool().execute(
             {"table_name": "employees", "n": 3},
@@ -402,7 +406,7 @@ class TestCountTool:
 
     async def test_count(self, test_csv: Path) -> None:
         ctx = _context("count-basic")
-        await RegisterTool().execute({"path": str(test_csv)}, context=ctx)
+        await RegisterTool().execute({"path": test_csv.as_uri()}, context=ctx)
 
         result = await CountTool().execute(
             {"table_name": "employees"},
@@ -434,7 +438,7 @@ class TestExportTool:
 
     async def test_export_csv(self, test_csv: Path, tmp_path: Path) -> None:
         ctx = _context("export-csv")
-        await RegisterTool().execute({"path": str(test_csv)}, context=ctx)
+        await RegisterTool().execute({"path": test_csv.as_uri()}, context=ctx)
 
         output_path = tmp_path / "output.csv"
         result = await ExportTool().execute(
@@ -453,7 +457,7 @@ class TestExportTool:
 
     async def test_export_json(self, test_csv: Path, tmp_path: Path) -> None:
         ctx = _context("export-json")
-        await RegisterTool().execute({"path": str(test_csv)}, context=ctx)
+        await RegisterTool().execute({"path": test_csv.as_uri()}, context=ctx)
 
         output_path = tmp_path / "output.json"
         result = await ExportTool().execute(
@@ -474,7 +478,7 @@ class TestExportTool:
 
     async def test_export_parquet(self, test_csv: Path, tmp_path: Path) -> None:
         ctx = _context("export-parquet")
-        await RegisterTool().execute({"path": str(test_csv)}, context=ctx)
+        await RegisterTool().execute({"path": test_csv.as_uri()}, context=ctx)
 
         output_path = tmp_path / "output.parquet"
         result = await ExportTool().execute(
@@ -489,7 +493,7 @@ class TestExportTool:
 
     async def test_export_unknown_format(self, test_csv: Path, tmp_path: Path) -> None:
         ctx = _context("export-bad-fmt")
-        await RegisterTool().execute({"path": str(test_csv)}, context=ctx)
+        await RegisterTool().execute({"path": test_csv.as_uri()}, context=ctx)
 
         output_path = tmp_path / "output.xyz"
         result = await ExportTool().execute(
@@ -504,7 +508,7 @@ class TestExportTool:
 
     async def test_export_explicit_format(self, test_csv: Path, tmp_path: Path) -> None:
         ctx = _context("export-explicit")
-        await RegisterTool().execute({"path": str(test_csv)}, context=ctx)
+        await RegisterTool().execute({"path": test_csv.as_uri()}, context=ctx)
 
         output_path = tmp_path / "data_export"
         result = await ExportTool().execute(
@@ -533,7 +537,7 @@ class TestFullPipeline:
 
         # 1. Register
         reg_result = await RegisterTool().execute(
-            {"path": str(test_csv)},
+            {"path": test_csv.as_uri()},
             context=ctx,
         )
         assert not reg_result.isError
@@ -650,9 +654,9 @@ class TestFullPipeline:
 
         # Register both
         reg = RegisterTool()
-        r1 = await reg.execute({"path": str(emp_csv)}, context=ctx)
+        r1 = await reg.execute({"path": emp_csv.as_uri()}, context=ctx)
         assert not r1.isError
-        r2 = await reg.execute({"path": str(dept_csv)}, context=ctx)
+        r2 = await reg.execute({"path": dept_csv.as_uri()}, context=ctx)
         assert not r2.isError
 
         # Verify two tables listed

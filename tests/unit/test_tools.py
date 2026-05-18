@@ -82,7 +82,11 @@ class TestRegisterTool:
         # than the historical "File not found" phrase. The error must
         # still surface the missing path so the agent can self-correct.
         assert "not found" in result.text.lower()
-        assert "/nonexistent/file.csv" in result.text
+        # url2pathname normalises to OS-native separators (Windows uses
+        # backslashes), so check for the filename + parent dir tokens
+        # independently of separator style.
+        assert "nonexistent" in result.text
+        assert "file.csv" in result.text
 
     @pytest.mark.asyncio
     async def test_metadata(self) -> None:

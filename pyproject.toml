@@ -40,7 +40,7 @@ classifiers = [
 ]
 dependencies = [
   "kaos-content>=0.1.0a2,<0.2",
-  "kaos-core>=0.1.0a10,<0.2",
+  "kaos-core>=0.1.0a12,<0.2",
   # duckdb 1.4.2 is the earliest release with prebuilt cp313 + cp314
   # wheels (1.1.1 was the first cp313-only; 1.4.2 added cp314). We
   # support Python 3.13 + 3.14, so the floor must clear both. Pre-1.4.2

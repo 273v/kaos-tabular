@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0a5] — 2026-05-20
+
+### Changed
+
+- **kaos-core floor raised to `>=0.1.0a12`** (post-URI-redesign +
+  Capability type). WU-F.2 of the 0.1.0 GA plan; catch-up to
+  kaos-core 0.1.0a12. No public API changes in kaos-tabular.
+
 ## [0.1.0a4] — 2026-05-17
 
 ### Changed

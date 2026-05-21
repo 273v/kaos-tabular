@@ -39,8 +39,8 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
-  "kaos-content>=0.1.0rc1,<0.2",
-  "kaos-core>=0.1.0rc1,<0.2",
+  "kaos-content>=0.1.0,<0.2",
+  "kaos-core>=0.1.0,<0.2",
   # duckdb 1.4.2 is the earliest release with prebuilt cp313 + cp314
   # wheels (1.1.1 was the first cp313-only; 1.4.2 added cp314). We
   # support Python 3.13 + 3.14, so the floor must clear both. Pre-1.4.2
@@ -50,7 +50,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-mcp = ["kaos-mcp>=0.1.0rc1,<0.2"]
+mcp = ["kaos-mcp>=0.1.0,<0.2"]
 
 [project.scripts]
 kaos-tabular = "kaos_tabular.cli:main"
@@ -72,7 +72,7 @@ dev = [
   "ty>=0.0.34,<0.1",
 ]
 dev-mcp = [
-  "kaos-mcp>=0.1.0rc1,<0.2",
+  "kaos-mcp>=0.1.0,<0.2",
 ]
 
 [project.urls]

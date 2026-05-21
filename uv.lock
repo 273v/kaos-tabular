@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.13"
 
 [options]
-exclude-newer = "2026-05-17T22:10:30.203938741Z"
+exclude-newer = "2026-05-18T00:27:00.486503603Z"
 exclude-newer-span = "PT72H"
 
 [options.exclude-newer-package]
@@ -375,16 +375,16 @@ wheels = [
 
 [[package]]
 name = "kaos-content"
-version = "0.1.0rc1"
+version = "0.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "kaos-core" },
     { name = "pydantic" },
     { name = "uuid6", marker = "python_full_version < '3.14'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2d/cc/a71df653ee5a0b9673a943c70fc750be9d8e961161adf4e9759bc0039f40/kaos_content-0.1.0rc1.tar.gz", hash = "sha256:f5f934bbb1c4610d2b248b65037ee18de0bc56d4756817fc7ae387cf7498b611", size = 1098156, upload-time = "2026-05-20T21:21:00.874Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/eb/5e/3cc6db536a819981fc49159228b95e66b891d3f4dcd7c4f6a5fff56b7968/kaos_content-0.1.0.tar.gz", hash = "sha256:d97e5199b234953fb1ed45df64f57c090e9d013533743c010a0f493a8a340b7e", size = 1098263, upload-time = "2026-05-20T23:54:02.342Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c1/67/033fb9a057471cc5658bc7e1fdb7f91b4b00666c425f23ce6ad42acaea2c/kaos_content-0.1.0rc1-py3-none-any.whl", hash = "sha256:04eb449b18d70f18ad535dd8fc3b2d31313f4e498becf108babfd2a9f3377710", size = 267585, upload-time = "2026-05-20T21:20:58.647Z" },
+    { url = "https://files.pythonhosted.org/packages/a4/3f/e592a1da97d7ece8d113ef23c98c8d94c593cfcf16ff4e41f3a1480b7676/kaos_content-0.1.0-py3-none-any.whl", hash = "sha256:0240c9d7f58364ab94fb6460febbf9d382b78723b0a7e1a3ff26b079da8c272a", size = 267543, upload-time = "2026-05-20T23:54:00.894Z" },
 ]
 
 [package.optional-dependencies]
@@ -394,21 +394,21 @@ markdown = [
 
 [[package]]
 name = "kaos-core"
-version = "0.1.0rc1"
+version = "0.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7e/56/97682b2cfeaeb1c9806b39b32b702a2dbe1a2695cd0e2c1012e30a4cfa80/kaos_core-0.1.0rc1.tar.gz", hash = "sha256:a84f52ac55d296fa7979d766ff157cc6164764ca42d93e45df78dbf8d53a42ef", size = 197743, upload-time = "2026-05-20T19:53:32.689Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5a/b7/e60e6d6a05010f77e7535b09528f9efa994d9594abde9b26feecea20f059/kaos_core-0.1.0.tar.gz", hash = "sha256:5535f80661492101caa1fefd536c5f3c6a3d3597c6eb1f505e974907931c6945", size = 197876, upload-time = "2026-05-20T23:04:17.606Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/02/61/ebb1da64a3e0c540ab16bb5e1b2d54adc9bc5366d0ed806f45cf15d0ed47/kaos_core-0.1.0rc1-py3-none-any.whl", hash = "sha256:0a691b6e4c5688368de2e0112138cfa46b3827887df728f19df55bc2abdf44c1", size = 151389, upload-time = "2026-05-20T19:53:30.723Z" },
+    { url = "https://files.pythonhosted.org/packages/44/cf/ffaeccc9320f967b694ecc764ad574d9d2e4ecc04c196dcecf337cca3d7f/kaos_core-0.1.0-py3-none-any.whl", hash = "sha256:1f6ef9862a3ff5136d485289a5c8ff6af30e7006a8ad14508bc0ff4ec3fac391", size = 151339, upload-time = "2026-05-20T23:04:16.199Z" },
 ]
 
 [[package]]
 name = "kaos-mcp"
-version = "0.1.0rc1"
+version = "0.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -419,9 +419,9 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "starlette" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/dd/8c/f7466d974a38006aee7369d5590d996580efbcc04ddf42c110eeb38eb795/kaos_mcp-0.1.0rc1.tar.gz", hash = "sha256:79e95c171aeab898e0e41c667b43cd50273a86f122f1cb8280fa44a8923fd545", size = 47105, upload-time = "2026-05-20T22:09:10.652Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/94/3f/bacaab55b64b36142a2d42913d105c7a27ebb028f25626fd09b5ad10550f/kaos_mcp-0.1.0.tar.gz", hash = "sha256:e2d40934509f1c3b8cf71f9d1d639e00a0c746a559ed5f812fab57de07ed2673", size = 47166, upload-time = "2026-05-21T00:14:36.153Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1b/f4/8ceea6a2d98619770dcff703d2ffa6225c8fa57ca673147ec52df70b5909/kaos_mcp-0.1.0rc1-py3-none-any.whl", hash = "sha256:2b35cbe128b9c4e63aca347b827287ee3dd9fee2a51ddda30a8540d146f7aac4", size = 52382, upload-time = "2026-05-20T22:09:08.977Z" },
+    { url = "https://files.pythonhosted.org/packages/75/73/89ab3e5f64173a4d064681b712e9345436226907896c3a845b7c07676f27/kaos_mcp-0.1.0-py3-none-any.whl", hash = "sha256:82d75a70a7fc5b99c33ac10ee6decd58a7fe0d7bc660a0e334d63e9799fe3de5", size = 52333, upload-time = "2026-05-21T00:14:34.906Z" },
 ]
 
 [[package]]
@@ -453,9 +453,9 @@ dev-mcp = [
 [package.metadata]
 requires-dist = [
     { name = "duckdb", specifier = ">=1.4.2" },
-    { name = "kaos-content", specifier = ">=0.1.0rc1,<0.2" },
-    { name = "kaos-core", specifier = ">=0.1.0rc1,<0.2" },
-    { name = "kaos-mcp", marker = "extra == 'mcp'", specifier = ">=0.1.0rc1,<0.2" },
+    { name = "kaos-content", specifier = ">=0.1.0,<0.2" },
+    { name = "kaos-core", specifier = ">=0.1.0,<0.2" },
+    { name = "kaos-mcp", marker = "extra == 'mcp'", specifier = ">=0.1.0,<0.2" },
 ]
 provides-extras = ["mcp"]
 
@@ -467,7 +467,7 @@ dev = [
     { name = "ruff", specifier = ">=0.11.0" },
     { name = "ty", specifier = ">=0.0.34,<0.1" },
 ]
-dev-mcp = [{ name = "kaos-mcp", specifier = ">=0.1.0rc1,<0.2" }]
+dev-mcp = [{ name = "kaos-mcp", specifier = ">=0.1.0,<0.2" }]
 
 [[package]]
 name = "markdown-it-py"

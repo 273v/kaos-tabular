@@ -40,7 +40,7 @@ beyond the DuckDB wheel, which ships prebuilt for Linux, macOS, and
 Windows on x86_64 and arm64. A
 single optional extra, `[mcp]`, adds `kaos-mcp` so `kaos-tabular-serve`
 can stand up a stdio or streamable-HTTP server. **There is no `[xlsx]`
-extra at `0.1.0a1`** — the previous `_register_xlsx` path introduced a
+extra at 0.1.0 GA** — the previous `_register_xlsx` path introduced a
 sideways `kaos-tabular -> kaos-office` dependency that the architecture
 DAG forbids, and was removed in audit-01 KTAB-002. The supported XLSX
 workflow is now: parse the file with `kaos_office.parse_xlsx(path)` (in
@@ -51,12 +51,12 @@ already public and unchanged.
 ## Install
 
 ```bash
-uv add kaos-tabular
+uv add "kaos-tabular>=0.1.0"
 # or
-pip install kaos-tabular
+pip install "kaos-tabular>=0.1.0"
 
 # Optional: stdio + streamable-HTTP MCP server entrypoint
-uv add 'kaos-tabular[mcp]'
+uv add 'kaos-tabular[mcp]>=0.1.0'
 ```
 
 `kaos-tabular` requires Python **3.13** or newer (3.14 is supported).
@@ -88,7 +88,7 @@ with TabularEngine() as engine:
     desc = engine.describe_table("orders")
     print(desc["row_count"], "rows in 'orders'")
 
-    # 4. Export — public API new in 0.1.0a1 (audit-01 KTAB-003).
+    # 4. Export — public engine API (audit-01 KTAB-003).
     engine.export_table("orders", "orders.parquet", format="parquet")
 ```
 
@@ -127,7 +127,7 @@ bridges. The most important entries:
 | **`engine.register_table(table, *, name=None)`** | Register a `kaos_content` `Table` (e.g. one returned by `kaos_office.parse_xlsx()`) as a DuckDB view. Returns the registered name. |
 | **`engine.execute(sql, *, max_rows=1000)`** | Run arbitrary DuckDB SQL. Wraps the user's SQL as `SELECT * FROM (<sql>) AS _q LIMIT N` — the hard cap is 10,000 rows. Returns a typed `Table`. |
 | **`engine.describe_table(name)` / `engine.list_tables()` / `engine.count(name)` / `engine.sample(name, n=5)`** | Introspection helpers. `describe_table` returns column metadata, row count, and sample values; `sample` returns a `Table` of N random rows. |
-| **`engine.export_table(name, path, *, format)`** | Public engine method new in `0.1.0a1` (audit-01 KTAB-003). Owns the DuckDB `COPY` SQL, format mapping (`csv` / `parquet` / `json`), and path quoting that the export tool and CLI used to reach into private internals for. |
+| **`engine.export_table(name, path, *, format)`** | Public engine method (audit-01 KTAB-003, shipped in 0.1.0 GA). Owns the DuckDB `COPY` SQL, format mapping (`csv` / `parquet` / `json`), and path quoting that the export tool and CLI used to reach into private internals for. |
 | **`engine.find_duplicates(name, *, columns=None)`** | Return rows whose values in `columns` (default: all columns) appear in more than one row. Uses DuckDB `QUALIFY COUNT(*) OVER (PARTITION BY …) > 1` so the SQL is one statement. |
 | **`engine.correlation(name, *, columns=None)`** | Long-form pairwise Pearson correlation matrix — returns `(col_a, col_b, corr)` rows. Default `columns=None` auto-selects every numeric column. |
 | **`engine.join(left, right, *, on, how="inner", target=None)`** | SQL JOIN via DuckDB's `USING (col)` clause so the join key appears once in the result. `how` ∈ `{inner, left, right, outer, semi, anti, cross}`; `target` materializes via `CREATE OR REPLACE TABLE` and registers. |
@@ -175,10 +175,18 @@ in **Concepts** above; it requires the `[mcp]` extra.
 |---|---|
 | **Python** | 3.13, 3.14 |
 | **OS** | Linux, macOS, Windows (pure Python — `Operating System :: OS Independent`; DuckDB ships native wheels for x86_64 and arm64 on all three) |
-| **Maturity** | Alpha (`Development Status :: 3 - Alpha`). The public API is documented in `kaos_tabular.__all__`: `EngineError`, `EngineEvent`, `KaosTabularError`, `QueryError`, `RegistrationError`, `TabularEngine`, `read_csv`, `read_json`, `read_parquet`, `__version__`. |
+| **Maturity** | 0.1.0 GA. The public API is documented in `kaos_tabular.__all__`: `EngineError`, `EngineEvent`, `KaosTabularError`, `QueryError`, `RegistrationError`, `TabularEngine`, `read_csv`, `read_json`, `read_parquet`, `__version__`. |
 | **Stability policy** | Pre-1.0: minor bumps may change behaviour. Every change is documented in [`CHANGELOG.md`](CHANGELOG.md). The MCP tool surface (`kaos-tabular-*` names) and the trust contract documented in [`docs/security.md`](docs/security.md) are public API and follow the same policy. After 1.0 we follow semver. |
 | **Test coverage** | 276 unit tests (`tests/unit/`) covering the engine, registration paths, error hierarchy, did-you-mean suggestions, MCP tools, CLI, and `serve.py`; a 32-test integration suite (`tests/integration/`) exercising real DuckDB sessions; and a relocated benchmark suite under `tests/benchmarks/` for wall-clock regressions. Bounded unit gate: `pytest tests/unit -m "not benchmark"`. Coverage floor enforced via `fail_under = 70` in `[tool.coverage.report]`. |
 | **Type checker** | Validated with [`ty`](https://docs.astral.sh/ty/), Astral's Python type checker. |
+
+## Documentation
+
+Per-package reference: [`docs/`](docs/) in this repo.
+
+Cross-cutting KAOS guides (agentic patterns, persona presets, settings
+policy, citations, MCP data flow, migration to 0.1.0 GA) live in
+[`kaos-modules/docs/guides/`](https://github.com/273v/kaos-modules/tree/main/docs/guides).
 
 ## Companion packages
 

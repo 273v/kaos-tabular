@@ -14,6 +14,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   0.1.0 GA release (WU-L #543) that froze the public API for the
   0.1.x line. Closes audit-04/kaos-tabular.md Family D (classifier drift).
 
+### Fixed
+
+- **`register_file` for multi-table SQLite sources now returns and
+  records actual table names.** `TabularEngine.register_file()`
+  always returned the placeholder `name` (file-stem or
+  caller-supplied `table_name`) and recorded `(name,)` in `history()`
+  — but for a multi-table SQLite source the placeholder is never a
+  real DuckDB table. Each SQLite source table becomes its own DuckDB
+  table; the placeholder is just a prefix or, when no `table_name`
+  was passed, unused entirely. `undo_last_register()` and
+  `list_tables()` therefore diverged.
+
+  `_register_sqlite()` now returns the tuple of actually-created
+  DuckDB tables; `register_file()` records that tuple in history and
+  appends each to `_registered` so `undo_last_register()` drops them
+  one at a time. Return value remains a single `str` for back-compat
+  — multi-table callers get the first created table name and should
+  read the most recent `history()` entry or call `list_tables()` to
+  enumerate the rest.
+
+  Closes audit-04/kaos-tabular.md F-001.
 
 
 ## [0.1.0] — 2026-05-20

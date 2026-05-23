@@ -69,7 +69,7 @@ In-scope:
 - **Export / write paths** — `export_table` and `save`. Path
   injection via embedded quotes in the caller-supplied path is the
   primary concern; `_q_lit` is the load-bearing mitigation.
-- **MCP tool surface** — the 8 `kaos-tabular-*` tools. Tool
+- **MCP tool surface** — the 17 `kaos-tabular-*` tools. Tool
   annotations (`openWorldHint`, `destructiveHint`) drive client
   auto-approval decisions; mismatches between annotation and actual
   behaviour are in-scope.

@@ -166,8 +166,8 @@ kaos-tabular-serve --http --port 8000                     # streamable HTTP
 `kaos-tabular query` opens a fresh in-memory engine, registers the input
 file, and runs the SQL — useful for one-shots without standing up a
 server. For `.duckdb` files the engine opens the database directly in
-read-only mode. `kaos-tabular-serve` exposes the fourteen MCP tools listed
-in **Concepts** above; it requires the `[mcp]` extra.
+read-only mode. `kaos-tabular-serve` exposes the seventeen MCP tools
+listed in **Concepts** above; it requires the `[mcp]` extra.
 
 ## Compatibility & status
 
@@ -177,7 +177,7 @@ in **Concepts** above; it requires the `[mcp]` extra.
 | **OS** | Linux, macOS, Windows (pure Python — `Operating System :: OS Independent`; DuckDB ships native wheels for x86_64 and arm64 on all three) |
 | **Maturity** | 0.1.0 GA. The public API is documented in `kaos_tabular.__all__`: `EngineError`, `EngineEvent`, `KaosTabularError`, `QueryError`, `RegistrationError`, `TabularEngine`, `read_csv`, `read_json`, `read_parquet`, `__version__`. |
 | **Stability policy** | Pre-1.0: minor bumps may change behaviour. Every change is documented in [`CHANGELOG.md`](CHANGELOG.md). The MCP tool surface (`kaos-tabular-*` names) and the trust contract documented in [`docs/security.md`](docs/security.md) are public API and follow the same policy. After 1.0 we follow semver. |
-| **Test coverage** | 276 unit tests (`tests/unit/`) covering the engine, registration paths, error hierarchy, did-you-mean suggestions, MCP tools, CLI, and `serve.py`; a 32-test integration suite (`tests/integration/`) exercising real DuckDB sessions; and a relocated benchmark suite under `tests/benchmarks/` for wall-clock regressions. Bounded unit gate: `pytest tests/unit -m "not benchmark"`. Coverage floor enforced via `fail_under = 70` in `[tool.coverage.report]`. |
+| **Test coverage** | 283 unit tests (`tests/unit/`) covering the engine, registration paths, error hierarchy, did-you-mean suggestions, MCP tools, CLI, and `serve.py`; a 32-test integration suite (`tests/integration/`) exercising real DuckDB sessions; and a relocated benchmark suite under `tests/benchmarks/` (6 benchmarks) for wall-clock regressions. Bounded unit gate: `pytest tests/unit -m "not benchmark"`. Coverage floor enforced via `fail_under = 70` in `[tool.coverage.report]`. |
 | **Type checker** | Validated with [`ty`](https://docs.astral.sh/ty/), Astral's Python type checker. |
 
 ## Documentation

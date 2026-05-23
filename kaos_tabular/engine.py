@@ -280,19 +280,48 @@ class TabularEngine:
                 f"SELECT * FROM {reader}('{escaped_path}')"
             )
             self._con.execute(sql)
+            registered = (name,)
         elif ext in (".sqlite", ".db", ".sqlite3"):
-            # SQLite → DuckDB sqlite scanner
-            self._register_sqlite(p, name)
+            # SQLite → DuckDB sqlite scanner. May register 1..N tables.
+            # The returned tuple is the actual set of DuckDB tables
+            # created, NOT the placeholder ``name`` — for a multi-table
+            # SQLite source the placeholder is never a real table.
+            # audit-04/kaos-tabular.md F-001.
+            registered = self._register_sqlite(p, name)
         else:
             msg = f"No handler for format: {ext!r}"
             raise ValueError(msg)
 
-        self._registered.append(name)
-        self._record("register", f"file:{p.name}", (name,))
-        return name
+        # Record every DuckDB table created, not just the placeholder.
+        # Mirrors what ``list_tables()`` will see + lets ``undo_last_register``
+        # actually drop the tables it claimed it created.
+        for created in registered:
+            if created not in self._registered:
+                self._registered.append(created)
+        self._record("register", f"file:{p.name}", tuple(registered))
+        # Return contract: single string for back-compat. For multi-table
+        # SQLite the caller gets the first table name; call ``list_tables()``
+        # or read the most recent ``history()`` entry to see all of them.
+        return registered[0]
 
-    def _register_sqlite(self, path: Path, name: str) -> None:
-        """Register SQLite tables via DuckDB sqlite scanner."""
+    def _register_sqlite(self, path: Path, name: str) -> tuple[str, ...]:
+        """Register SQLite tables via DuckDB sqlite scanner.
+
+        Returns the tuple of DuckDB table names actually created. For a
+        single-table SQLite source this is ``(name,)``. For multi-table
+        sources each SQLite source table becomes its own DuckDB table —
+        either ``(src_table_1, src_table_2, …)`` when the caller did
+        not pass an explicit ``table_name`` (the inferred ``name`` is
+        the file stem and is NOT a real table) or
+        ``(name_src_table_1, name_src_table_2, …)`` when an explicit
+        ``table_name`` was passed.
+
+        audit-04/kaos-tabular.md F-001: the previous version returned
+        ``None`` and the caller unconditionally appended ``name`` to
+        ``self._registered`` and recorded ``(name,)`` in history — but
+        for the multi-table branch no DuckDB table called ``name``
+        exists, so ``undo_last_register`` and ``list_tables`` diverged.
+        """
         try:
             self._con.execute("INSTALL sqlite")
             self._con.execute("LOAD sqlite")
@@ -335,17 +364,20 @@ class TabularEngine:
                 f"CREATE OR REPLACE TABLE {_quote_ident(name)} AS "  # nosec B608
                 f"SELECT * FROM sqlite_scan({escaped}, {_q_lit(src_table)})"
             )
-        else:
-            # Multiple tables: register each. Same quoting contract as
-            # the single-table branch above.
-            for (src_table,) in tables_result:
-                tgt = f"{name}_{src_table}" if name != path.stem else src_table
-                self._con.execute(
-                    f"CREATE OR REPLACE TABLE {_quote_ident(tgt)} AS "  # nosec B608
-                    f"SELECT * FROM sqlite_scan({escaped}, {_q_lit(src_table)})"
-                )
-                if tgt != name:
-                    self._registered.append(tgt)
+            return (name,)
+        # Multiple tables: register each. Same quoting contract as the
+        # single-table branch above. We do NOT call ``self._registered.append``
+        # here — the caller (``register_file``) owns that bookkeeping and
+        # uses the returned tuple as its source of truth (audit-04 F-001).
+        created: list[str] = []
+        for (src_table,) in tables_result:
+            tgt = f"{name}_{src_table}" if name != path.stem else src_table
+            self._con.execute(
+                f"CREATE OR REPLACE TABLE {_quote_ident(tgt)} AS "  # nosec B608
+                f"SELECT * FROM sqlite_scan({escaped}, {_q_lit(src_table)})"
+            )
+            created.append(tgt)
+        return tuple(created)
 
     def register_table(self, table: Table, *, name: str | None = None) -> str:
         """Register a kaos-content Table as a queryable DuckDB table.

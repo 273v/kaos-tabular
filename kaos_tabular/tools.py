@@ -1,4 +1,4 @@
-"""MCP tools for kaos-tabular: 8 tools for tabular data operations.
+"""MCP tools for kaos-tabular: 17 tools for tabular data operations.
 
 Tools follow the kaos-core KaosTool ABC pattern with explicit ToolAnnotations,
 three-part error messages, and flat parameter schemas.

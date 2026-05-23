@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `pyproject.toml` classifier bumped from `Development Status :: 3 - Alpha`
+  to `Development Status :: 5 - Production/Stable` to reflect the
+  0.1.0 GA release (WU-L #543) that froze the public API for the
+  0.1.x line. Closes audit-04/kaos-tabular.md Family D (classifier drift).
+
+
 
 ## [0.1.0] — 2026-05-20
 

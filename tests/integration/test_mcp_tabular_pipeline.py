@@ -147,7 +147,10 @@ class TestRegisterTool:
         # "File not found" phrase; the path must still appear so the
         # agent can self-correct.
         assert "not found" in text.lower()
-        assert "/nonexistent/data.csv" in text
+        # Path is echoed for agent self-correction; separators are
+        # OS-native (forward slash on POSIX, backslash on Windows), so
+        # assert the components rather than a literal slash form.
+        assert "nonexistent" in text and "data.csv" in text
 
     async def test_register_message_includes_guidance(self, test_csv: Path) -> None:
         tool = RegisterTool()

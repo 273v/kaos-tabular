@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`[mcp]` extra floor.** Raised `kaos-mcp` from `>=0.1.0,<0.2` to
+  `>=0.1.5,<0.2` in the `[mcp]` extra (and the `dev-mcp` group) (#51).
+  Earlier kaos-mcp releases leave `mcp` unbounded, so a fresh or
+  lowest-direct install could resolve `mcp` 2.x, which removed
+  `mcp.server.fastmcp`, and `import kaos_mcp` then failed. kaos-mcp 0.1.5
+  pins `mcp<2`. The `min-deps` CI lane now actually tests the declared
+  minimums (`uv run --no-sync`).
+
 ## [0.1.3] — 2026-06-01
 
 ### Fixed

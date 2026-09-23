@@ -31,10 +31,10 @@ repos:
       - id: detect-private-key
 
   # ───────────── ruff (format + lint) ─────────────
-  # Pinned to match the dev group in pyproject.toml (>=0.15.12) to avoid
+  # Pinned to match the dev group in pyproject.toml (>=0.16.8) to avoid
   # drift between local hooks and `uv sync --group dev`.
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.12
+    rev: v0.16.8
     hooks:
       - id: ruff-format
         files: ^(kaos_tabular|tests)/.*\.py$
